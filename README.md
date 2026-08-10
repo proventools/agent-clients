@@ -11,9 +11,8 @@ and customer systems are not part of this repository.
 
 ## Status
 
-The clients are being prepared for an initial beta. Both package manifests
-remain protected by `private: true` until the separately approved bootstrap
-release.
+The CLI is prepared for its separately approved bootstrap beta. The MCP
+package remains protected by `private: true` until its own review and release.
 
 ## Verify
 

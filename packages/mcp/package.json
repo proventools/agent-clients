@@ -7,7 +7,7 @@
   "homepage": "https://www.proventools.net",
   "repository": {
     "type": "git",
-    "url": "https://github.com/proventools/agent-clients.git",
+    "url": "git+https://github.com/proventools/agent-clients.git",
     "directory": "packages/mcp"
   },
   "bugs": {
@@ -26,7 +26,7 @@
     "LICENSE"
   ],
   "bin": {
-    "proventools-mcp": "./index.js"
+    "proventools-mcp": "index.js"
   },
   "publishConfig": {
     "access": "public",

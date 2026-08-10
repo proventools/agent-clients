@@ -42,6 +42,7 @@ const packages = [
     directory: "packages/cli",
     name: "proventools",
     binName: "proventools",
+    private: false,
     repositoryDirectory: "packages/cli",
     declaredFiles: ["index.js", "README.md", "LICENSE", "skills"],
     archiveFiles: [
@@ -62,6 +63,7 @@ const packages = [
     directory: "packages/mcp",
     name: "@proventools/mcp",
     binName: "proventools-mcp",
+    private: true,
     repositoryDirectory: "packages/mcp",
     declaredFiles: ["index.js", "README.md", "LICENSE"],
     archiveFiles: [
@@ -101,7 +103,7 @@ function assertPublicProductMetadata(manifest, repositoryDirectory) {
   assert.equal(manifest.homepage, "https://www.proventools.net");
   assert.deepEqual(manifest.repository, {
     type: "git",
-    url: "https://github.com/proventools/agent-clients.git",
+    url: "git+https://github.com/proventools/agent-clients.git",
     directory: repositoryDirectory,
   });
   assert.deepEqual(manifest.bugs, { url: "https://www.proventools.net/contact" });
@@ -145,7 +147,10 @@ for (const packageDefinition of packages) {
     const sourceManifest = await readJson(path.join(sourceDirectory, "package.json"));
     assert.equal(sourceManifest.name, packageDefinition.name);
     assert.equal(sourceManifest.version, betaVersion);
-    assert.equal(sourceManifest.private, true);
+    assert.equal(
+      Object.hasOwn(sourceManifest, "private") ? sourceManifest.private : false,
+      packageDefinition.private,
+    );
     assert.equal(sourceManifest.license, "MIT");
     assert.equal(sourceManifest.engines.node, ">=22.14.0");
     assert.deepEqual(sourceManifest.files, packageDefinition.declaredFiles);
@@ -182,7 +187,10 @@ for (const packageDefinition of packages) {
     const artifactManifest = await readJson(path.join(artifactRoot, "package.json"));
     assert.equal(artifactManifest.name, sourceManifest.name);
     assert.equal(artifactManifest.version, sourceManifest.version);
-    assert.equal(artifactManifest.private, true);
+    assert.equal(
+      Object.hasOwn(artifactManifest, "private") ? artifactManifest.private : false,
+      packageDefinition.private,
+    );
     assert.equal(artifactManifest.license, "MIT");
     assert.equal(artifactManifest.engines.node, ">=22.14.0");
     assert.deepEqual(artifactManifest.files, packageDefinition.declaredFiles);
@@ -207,7 +215,7 @@ for (const packageDefinition of packages) {
     }
 
     const expectedBinPath = sourceManifest.bin[packageDefinition.binName];
-    assert.equal(expectedBinPath, "./index.js");
+    assert.equal(expectedBinPath, "index.js");
     const entryPoint = path.join(artifactRoot, expectedBinPath);
     assert.notEqual((await stat(entryPoint)).mode & 0o111, 0, "the packaged bin must be executable");
     packageDefinition.verifyVersion(entryPoint, artifactManifest);

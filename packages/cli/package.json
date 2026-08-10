@@ -1,0 +1,40 @@
+{
+  "name": "proventools",
+  "version": "0.1.0-beta.1",
+  "private": true,
+  "description": "Read-only command-line client for ProvenTools",
+  "license": "MIT",
+  "homepage": "https://www.proventools.net",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/proventools/agent-clients.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://www.proventools.net/contact"
+  },
+  "keywords": [
+    "proventools",
+    "business-ideas",
+    "cli",
+    "ai-agents"
+  ],
+  "type": "module",
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE",
+    "skills"
+  ],
+  "bin": {
+    "proventools": "./index.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "beta"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}

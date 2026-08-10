@@ -1,0 +1,45 @@
+name: Stage npm beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to stage for human approval on npm
+        required: true
+        type: choice
+        options:
+          - cli
+          - mcp
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Use Node.js 22.14
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.14.0
+          registry-url: https://registry.npmjs.org
+      - name: Install the staged-publishing npm release
+        run: npm install --global npm@11.18.0 --ignore-scripts --no-audit --no-fund
+      - name: Verify packages
+        run: npm test
+      - name: Stage the CLI beta
+        if: inputs.package == 'cli'
+        working-directory: packages/cli
+        run: npm stage publish --tag beta --access public --ignore-scripts
+      - name: Stage the MCP beta
+        if: inputs.package == 'mcp'
+        working-directory: packages/mcp
+        run: npm stage publish --tag beta --access public --ignore-scripts

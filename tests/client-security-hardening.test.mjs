@@ -243,6 +243,17 @@ test("MCP parses split UTF-8 and CRLF frames, handles multiple frames, and ignor
   assert.equal(messages.length, 0, "notifications must not produce responses");
 });
 
+test("MCP processes a valid final frame without a trailing newline", async () => {
+  const request = JSON.stringify({ jsonrpc: "2.0", id: 8, method: "ping" });
+  const result = await runProcess(["packages/mcp/index.js"], { input: request });
+  assert.equal(result.code, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    jsonrpc: "2.0",
+    id: 8,
+    result: {},
+  });
+});
+
 test("MCP rejects an overlong no-newline frame without losing the next request", async () => {
   const client = startMcp();
   await client.send(Buffer.alloc(256 * 1024 + 1, 0x61));
@@ -284,49 +295,62 @@ test("MCP refuses redirects even when the redirect target is another loopback UR
   await client.close();
 });
 
-test("MCP preserves quote-first credit behavior and idempotency headers", async (t) => {
-  let received;
-  const api = await listen(async (request, response) => {
-    const body = [];
-    for await (const chunk of request) body.push(chunk);
-    received = {
-      method: request.method,
-      authorization: request.headers.authorization,
-      idempotencyKey: request.headers["idempotency-key"],
-      body: JSON.parse(Buffer.concat(body).toString("utf8")),
+test("MCP beta neither advertises nor dispatches paid mutation tools", async () => {
+  const client = startMcp({ env: { PROVENTOOLS_API_URL: "https://attacker.example" } });
+
+  await client.send({ jsonrpc: "2.0", id: 1, method: "tools/list" });
+  const listed = await client.waitFor((message) => message.id === 1);
+  const toolNames = new Set(listed.result.tools.map(({ name }) => name));
+  assert.equal(toolNames.has("request_evidence_refresh"), false);
+  assert.equal(toolNames.has("validate_my_idea"), false);
+  for (const tool of listed.result.tools) {
+    assert.match(tool.description, /Credit cost: 0/, tool.name);
+  }
+
+  const source = await readFile(path.join(ROOT, "packages/mcp/index.js"), "utf8");
+  assert.doesNotMatch(source, /\/refresh[`"']/);
+  assert.doesNotMatch(source, /apiRequest\("\/validations"/);
+
+  for (const [id, name] of [
+    [2, "request_evidence_refresh"],
+    [3, "validate_my_idea"],
+  ]) {
+    await client.send(toolCall(id, name, { idempotencyKey: `blocked-${id}` }));
+    const response = await client.waitFor((message) => message.id === id);
+    assert.equal(response.result.isError, true);
+    assert.match(response.result.content[0].text, /unknown tool/i);
+  }
+  await client.close();
+});
+
+test("MCP frame assembly remains bounded under high fragmentation", async () => {
+  const source = await readFile(path.join(ROOT, "packages/mcp/index.js"), "utf8");
+  assert.doesNotMatch(source, /Buffer\.concat\(\[inputBuffer/);
+  assert.match(source, /Buffer\.concat\(inputFragments, inputBufferBytes\)/);
+
+  const preload = `data:text/javascript,${encodeURIComponent(`
+    const originalConcat = Buffer.concat;
+    let concatCalls = 0;
+    Buffer.concat = (...args) => {
+      concatCalls += 1;
+      if (concatCalls > 4) throw new Error("excessive Buffer.concat calls");
+      return originalConcat(...args);
     };
-    response.statusCode = 409;
-    response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({
-      quoteRequired: true,
-      creditCost: 3,
-      quote: {
-        id: "quote-1",
-        approvalUrl: "/dashboard/live/credit-quotes/quote-1",
-      },
-    }));
-  });
-  t.after(api.close);
-  const client = startMcp({ env: { PROVENTOOLS_API_URL: api.origin } });
-  await client.send(toolCall(1, "request_evidence_refresh", {
-    id: "idea-1",
-    reason: "Recheck demand",
-    idempotencyKey: "stable-operation-key",
-  }));
-  const response = await client.waitFor((message) => message.id === 1);
-  assert.notEqual(response.result.isError, true);
-  assert.deepEqual(received, {
-    method: "POST",
-    authorization: `Bearer ${API_KEY}`,
-    idempotencyKey: "stable-operation-key",
-    body: { reason: "Recheck demand" },
-  });
-  const toolResult = JSON.parse(response.result.content[0].text);
-  assert.equal(toolResult.quoteRequired, true);
-  assert.equal(toolResult.creditCost, 3);
-  assert.equal(toolResult.customerActionRequired, true);
-  assert.match(toolResult.message, /nothing has been spent/);
-  assert.match(toolResult.message, /same idempotencyKey and quoteId/);
+  `)}`;
+  const client = startMcp({ nodeArgs: ["--import", preload] });
+  const request = Buffer.from(`${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 77,
+    method: "ping",
+    params: { padding: "x".repeat(512) },
+  })}\n`);
+
+  for (let offset = 0; offset < request.length; offset += 16) {
+    await client.send(request.subarray(offset, offset + 16));
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+
+  assert.deepEqual((await client.waitFor((message) => message.id === 77)).result, {});
   await client.close();
 });
 
@@ -465,9 +489,8 @@ test("MCP descriptions disclose optional OpenAI/provider processing and setup do
     assert.match(byName.get(name), /OpenAI/);
     assert.match(byName.get(name), /Credit cost: 0/);
   }
-  for (const name of ["request_evidence_refresh", "validate_my_idea"]) {
-    assert.match(byName.get(name), /configured research or model providers/);
-  }
+  assert.equal(byName.has("request_evidence_refresh"), false);
+  assert.equal(byName.has("validate_my_idea"), false);
   await client.close();
 
   const readmes = await Promise.all([

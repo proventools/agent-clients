@@ -20,8 +20,6 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const ZERO_CREDIT = "Credit cost: 0. Reads stored ProvenTools data only.";
 const OPTIONAL_OPENAI =
   "Credit cost: 0. Depending on server configuration, ProvenTools may send any natural-language input and selected stored idea fields to OpenAI for semantic retrieval and bounded answer synthesis; otherwise it uses PostgreSQL retrieval and deterministic text.";
-const ASYNC_PROVIDER_PROCESSING =
-  "The queued job may later send the submitted data to configured research or model providers from the ProvenTools backend; the local MCP process never contacts those providers.";
 const intelligenceProperties = {
   query: { type: "string", description: "What you want to build or compare." },
   minimumScore: { type: "number", minimum: 0, maximum: 100 },
@@ -136,63 +134,12 @@ const tools = [
     },
   },
   {
-    name: "request_evidence_refresh",
-    description:
-      `Costs 3 credits. First call returns a single-use quote and spends nothing; retry with the same idempotencyKey and an approved quoteId, unless backend auto-spend is enabled. ${ASYNC_PROVIDER_PROCESSING}`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "The idea id returned by search_ideas." },
-        reason: { type: "string", description: "Optional reason for requesting a refresh." },
-        idempotencyKey: {
-          type: "string",
-          description: "Required stable key. Reuse it when submitting the approved quote.",
-        },
-        quoteId: {
-          type: "string",
-          description: "Optional approved quote id from the first call.",
-        },
-      },
-      required: ["id", "idempotencyKey"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "validate_my_idea",
-    description:
-      `Costs 10 credits. First call returns a single-use quote and spends nothing; retry with the same idempotencyKey and an approved quoteId, unless backend auto-spend is enabled. ${ASYNC_PROVIDER_PROCESSING}`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        problem: { type: "string" },
-        solution: { type: "string" },
-        targetBuyer: { type: "string" },
-        opportunityType: {
-          type: "string",
-          enum: ["web_saas", "ios_app", "developer_tool", "platform_app"],
-        },
-        context: { type: "string" },
-        idempotencyKey: {
-          type: "string",
-          description: "Required stable key. Reuse it when submitting the approved quote.",
-        },
-        quoteId: {
-          type: "string",
-          description: "Optional approved quote id from the first call.",
-        },
-      },
-      required: ["title", "problem", "idempotencyKey"],
-      additionalProperties: false,
-    },
-  },
-  {
     name: "get_validation_report",
     description: `Get the current status or stored result for one of your validation jobs. ${ZERO_CREDIT}`,
     inputSchema: {
       type: "object",
       properties: {
-        id: { type: "string", description: "The validation id returned by validate_my_idea." },
+        id: { type: "string", description: "A validation id from your ProvenTools account." },
       },
       required: ["id"],
       additionalProperties: false,
@@ -412,7 +359,6 @@ async function apiRequest(path, requestOptions = {}) {
     "X-ProvenTools-Channel": "mcp",
   };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
-  if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -430,10 +376,6 @@ async function apiRequest(path, requestOptions = {}) {
     if (!response.ok) {
       const apiMessage = payload?.error?.message;
       const apiCode = payload?.error?.code;
-
-      if (response.status === 409 && payload?.quoteRequired === true) {
-        return payload;
-      }
 
       if (response.status === 401) {
         throw new ToolError(
@@ -497,12 +439,6 @@ function requiredId(args) {
   return id;
 }
 
-function requiredString(args, name) {
-  const value = optionalString(args, name);
-  if (!value) throw new ToolError(`${name} is required.`);
-  return value;
-}
-
 function intelligenceBody(action, args) {
   const filterNames = [
     "minimumScore",
@@ -527,19 +463,6 @@ function intelligenceBody(action, args) {
     ...(args.limit ? { limit: args.limit } : {}),
     ...(Object.keys(filters).length ? { filters } : {}),
   };
-}
-
-function paidToolText(data) {
-  const guidance = data?.quoteRequired
-    ? {
-        customerActionRequired: true,
-        message:
-          `This action costs ${data.creditCost} credits and nothing has been spent. `
-          + `Ask the customer to approve quote ${data.quote.id} at ${apiBaseUrl()}${data.quote.approvalUrl}, `
-          + "then call this tool again with the same idempotencyKey and quoteId.",
-      }
-    : { customerActionRequired: false };
-  return toolText(JSON.stringify({ ...data, ...guidance }, null, 2));
 }
 
 async function callTool(name, rawArguments) {
@@ -595,48 +518,6 @@ async function callTool(name, rawArguments) {
         `/ideas/${encodeURIComponent(id)}/evidence${params.size ? `?${params}` : ""}`
       );
       return toolText(JSON.stringify(data, null, 2));
-    }
-    case "request_evidence_refresh": {
-      const id = requiredId(args);
-      const reason = optionalString(args, "reason");
-      const idempotencyKey = requiredString(args, "idempotencyKey");
-      const quoteId = optionalString(args, "quoteId");
-      const data = await apiRequest(
-        `/ideas/${encodeURIComponent(id)}/refresh`,
-        {
-          method: "POST",
-          body: { ...(reason ? { reason } : {}), ...(quoteId ? { quoteId } : {}) },
-          idempotencyKey,
-        }
-      );
-      return paidToolText(data);
-    }
-    case "validate_my_idea": {
-      const title = optionalString(args, "title");
-      const problem = optionalString(args, "problem");
-      if (!title) throw new ToolError("title is required.");
-      if (!problem) throw new ToolError("problem is required.");
-      const idempotencyKey = requiredString(args, "idempotencyKey");
-      const quoteId = optionalString(args, "quoteId");
-      const body = {
-        title,
-        problem,
-        ...(quoteId ? { quoteId } : {}),
-        ...(["solution", "targetBuyer", "opportunityType", "context"].reduce(
-          (result, field) => {
-            const value = optionalString(args, field);
-            if (value) result[field] = value;
-            return result;
-          },
-          {}
-        )),
-      };
-      const data = await apiRequest("/validations", {
-        method: "POST",
-        body,
-        idempotencyKey,
-      });
-      return paidToolText(data);
     }
     case "get_validation_report": {
       const data = await apiRequest(
@@ -697,7 +578,7 @@ async function handleMessage(message) {
         capabilities: { tools: {} },
         serverInfo: { name: "@proventools/mcp", version: SERVER_VERSION },
         instructions:
-          "Browse stored ProvenTools data at 0 credits. Intelligence tools disclose optional server-side OpenAI processing. Paid tools disclose their exact credit cost and require an approved quote or backend-enforced auto-spend policy before any debit.",
+          "Every exposed tool costs 0 credits. Browse stored ProvenTools data and existing validation results. Intelligence tools disclose optional server-side OpenAI processing. This beta cannot spend credits or start paid jobs.",
       });
       return;
     case "tools/list":
@@ -739,7 +620,8 @@ async function handleMessage(message) {
 }
 
 let activeToolCalls = 0;
-let inputBuffer = Buffer.alloc(0);
+let inputFragments = [];
+let inputBufferBytes = 0;
 let discardingOversizedMessage = false;
 let bufferedInputBytes = 0;
 let inputEnded = false;
@@ -768,7 +650,8 @@ function processInputLine(lineBuffer) {
 function rejectOversizedMessage() {
   if (discardingOversizedMessage) return;
   discardingOversizedMessage = true;
-  inputBuffer = Buffer.alloc(0);
+  inputFragments = [];
+  inputBufferBytes = 0;
   protocolError(
     null,
     -32600,
@@ -782,7 +665,8 @@ function bufferInput(chunk) {
     protocolError(null, -32600, "Input backlog exceeded the MCP server safety limit.");
     bufferedInput.length = 0;
     bufferedInputBytes = 0;
-    inputBuffer = Buffer.alloc(0);
+    inputFragments = [];
+    inputBufferBytes = 0;
     process.stdin.destroy();
     return;
   }
@@ -799,12 +683,11 @@ function processInputChunk(chunk) {
     const segment = chunk.subarray(offset, end);
 
     if (!discardingOversizedMessage) {
-      if (inputBuffer.length + segment.length > MAX_CLIENT_MESSAGE_BYTES) {
+      if (inputBufferBytes + segment.length > MAX_CLIENT_MESSAGE_BYTES) {
         rejectOversizedMessage();
       } else if (segment.length > 0) {
-        inputBuffer = inputBuffer.length === 0
-          ? Buffer.from(segment)
-          : Buffer.concat([inputBuffer, segment], inputBuffer.length + segment.length);
+        inputFragments.push(Buffer.from(segment));
+        inputBufferBytes += segment.length;
       }
     }
 
@@ -812,9 +695,10 @@ function processInputChunk(chunk) {
     if (discardingOversizedMessage) {
       discardingOversizedMessage = false;
     } else {
-      processInputLine(inputBuffer);
+      processInputLine(Buffer.concat(inputFragments, inputBufferBytes));
     }
-    inputBuffer = Buffer.alloc(0);
+    inputFragments = [];
+    inputBufferBytes = 0;
     offset = newline + 1;
 
     if (stdoutBlocked && offset < chunk.length) {
@@ -825,10 +709,11 @@ function processInputChunk(chunk) {
 }
 
 function finishInput() {
-  if (!discardingOversizedMessage && inputBuffer.length > 0) {
-    processInputLine(inputBuffer);
+  if (!discardingOversizedMessage && inputBufferBytes > 0) {
+    processInputLine(Buffer.concat(inputFragments, inputBufferBytes));
   }
-  inputBuffer = Buffer.alloc(0);
+  inputFragments = [];
+  inputBufferBytes = 0;
 }
 
 function resumeInputAfterOutputDrain() {

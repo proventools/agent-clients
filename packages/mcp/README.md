@@ -1,8 +1,8 @@
 # ProvenTools MCP server
 
 Beta local stdio MCP access to the ProvenTools curated idea library, stored
-evidence, build prompts, and asynchronous Live jobs. The package uses Node.js
-built-ins only and does not host a remote MCP endpoint.
+evidence, build prompts, credit balances, and existing validation reports. The
+package uses Node.js built-ins only and does not host a remote MCP endpoint.
 
 ## Requirements
 
@@ -63,8 +63,6 @@ implements `initialize`, `tools/list`, and `tools/call`.
 - `get_build_prompt({ id })`
 - `whats_new()`
 - `get_idea_evidence({ id, historyLimit? })`
-- `request_evidence_refresh({ id, reason?, idempotencyKey? })`
-- `validate_my_idea({ title, problem, solution?, targetBuyer?, opportunityType?, context?, idempotencyKey? })`
 - `get_validation_report({ id })`
 - `get_credit_balance()`
 - `recommend_ideas({ query, ...filters })`
@@ -78,10 +76,9 @@ Intelligence tools may send natural-language input and selected stored idea
 fields to OpenAI for semantic retrieval and bounded synthesis when the
 server-side feature is enabled.
 
-Refresh and validation tools create asynchronous jobs that may spend credits
-and send submitted data to configured research or model providers. Agents
-should obtain user approval before calling them. The local MCP process never
-receives provider credentials or contacts those providers directly.
+Every tool in this beta costs zero credits. It cannot request evidence
+refreshes, submit validations, spend credits, or start paid jobs. Existing
+validation reports and credit balances remain available as read-only data.
 
 ## Network and process safety
 

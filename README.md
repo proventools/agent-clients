@@ -11,8 +11,7 @@ and customer systems are not part of this repository.
 
 ## Status
 
-The CLI beta is published on npm and GitHub. The MCP beta has passed its
-security review and is prepared for a separately approved bootstrap release.
+The CLI and read-only local MCP betas are published on npm and GitHub.
 
 ## Verify
 

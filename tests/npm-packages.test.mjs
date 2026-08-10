@@ -7,7 +7,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const betaVersion = "0.1.0-beta.1";
 const expectedPublishConfig = {
   access: "public",
   registry: "https://registry.npmjs.org/",
@@ -41,6 +40,7 @@ const packages = [
   {
     directory: "packages/cli",
     name: "proventools",
+    version: "0.1.0-beta.1",
     binName: "proventools",
     private: false,
     repositoryDirectory: "packages/cli",
@@ -62,6 +62,7 @@ const packages = [
   {
     directory: "packages/mcp",
     name: "@proventools/mcp",
+    version: "0.1.0-beta.2",
     binName: "proventools-mcp",
     private: false,
     repositoryDirectory: "packages/mcp",
@@ -146,7 +147,7 @@ for (const packageDefinition of packages) {
     const sourceDirectory = path.join(repositoryRoot, packageDefinition.directory);
     const sourceManifest = await readJson(path.join(sourceDirectory, "package.json"));
     assert.equal(sourceManifest.name, packageDefinition.name);
-    assert.equal(sourceManifest.version, betaVersion);
+    assert.equal(sourceManifest.version, packageDefinition.version);
     assert.equal(
       Object.hasOwn(sourceManifest, "private") ? sourceManifest.private : false,
       packageDefinition.private,

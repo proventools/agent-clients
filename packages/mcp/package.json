@@ -1,6 +1,6 @@
 {
   "name": "@proventools/mcp",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Read-only local MCP server for the ProvenTools idea library",
   "license": "MIT",
   "homepage": "https://www.proventools.net",

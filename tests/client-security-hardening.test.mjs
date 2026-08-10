@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -270,6 +270,88 @@ test("MCP refuses untrusted origins before an API key can leave the process", as
   const response = await client.waitFor((message) => message.id === 1);
   assert.equal(response.result.isError, true);
   assert.match(response.result.content[0].text, /untrusted origin/i);
+  await client.close();
+});
+
+test("MCP securely reuses the API key saved by proventools login", async (t) => {
+  const homeDirectory = await mkdtemp(path.join(tmpdir(), "proventools-mcp-home-"));
+  const configDirectory = path.join(homeDirectory, ".config", "proventools");
+  const configPath = path.join(configDirectory, "config.json");
+  await mkdir(configDirectory, { recursive: true, mode: 0o700 });
+  await writeFile(configPath, `${JSON.stringify({ apiKey: API_KEY })}\n`, { mode: 0o600 });
+  await chmod(configPath, 0o600);
+
+  let authorization;
+  const api = await listen((request, response) => {
+    authorization = request.headers.authorization;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ credits: 0 }));
+  });
+  t.after(async () => {
+    await api.close();
+    await rm(homeDirectory, { recursive: true, force: true });
+  });
+
+  const client = startMcp({
+    env: {
+      HOME: homeDirectory,
+      PROVENTOOLS_API_KEY: undefined,
+      PROVENTOOLS_API_URL: api.origin,
+    },
+  });
+  await client.send(toolCall(1, "get_credit_balance"));
+  const response = await client.waitFor((message) => message.id === 1);
+  assert.equal(response.result.isError, undefined);
+  assert.equal(authorization, `Bearer ${API_KEY}`);
+  await client.close();
+});
+
+test("MCP refuses to read a stored key from a broadly accessible config", async (t) => {
+  if (process.platform === "win32") return;
+  const homeDirectory = await mkdtemp(path.join(tmpdir(), "proventools-mcp-home-"));
+  const configDirectory = path.join(homeDirectory, ".config", "proventools");
+  const configPath = path.join(configDirectory, "config.json");
+  await mkdir(configDirectory, { recursive: true, mode: 0o700 });
+  await writeFile(configPath, `${JSON.stringify({ apiKey: API_KEY })}\n`, { mode: 0o644 });
+  await chmod(configPath, 0o644);
+  t.after(() => rm(homeDirectory, { recursive: true, force: true }));
+
+  const client = startMcp({
+    env: {
+      HOME: homeDirectory,
+      PROVENTOOLS_API_KEY: undefined,
+      PROVENTOOLS_API_URL: "https://www.proventools.net",
+    },
+  });
+  await client.send(toolCall(1, "get_credit_balance"));
+  const response = await client.waitFor((message) => message.id === 1);
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.content[0].text, /accessible by other users/i);
+  await client.close();
+});
+
+test("MCP refuses a symlinked stored-key config", async (t) => {
+  if (process.platform === "win32") return;
+  const homeDirectory = await mkdtemp(path.join(tmpdir(), "proventools-mcp-home-"));
+  const configDirectory = path.join(homeDirectory, ".config", "proventools");
+  const configPath = path.join(configDirectory, "config.json");
+  const targetPath = path.join(homeDirectory, "target.json");
+  await mkdir(configDirectory, { recursive: true, mode: 0o700 });
+  await writeFile(targetPath, `${JSON.stringify({ apiKey: API_KEY })}\n`, { mode: 0o600 });
+  await symlink(targetPath, configPath);
+  t.after(() => rm(homeDirectory, { recursive: true, force: true }));
+
+  const client = startMcp({
+    env: {
+      HOME: homeDirectory,
+      PROVENTOOLS_API_KEY: undefined,
+      PROVENTOOLS_API_URL: "https://www.proventools.net",
+    },
+  });
+  await client.send(toolCall(1, "get_credit_balance"));
+  const response = await client.waitFor((message) => message.id === 1);
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.content[0].text, /symlinked ProvenTools config/i);
   await client.close();
 });
 

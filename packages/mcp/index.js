@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 
-const SERVER_VERSION = "0.1.0-beta.1";
+import { constants as fsConstants } from "node:fs";
+import { open } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+const SERVER_VERSION = "0.1.0-beta.2";
 const PROTOCOL_VERSION = "2024-11-05";
+const API_KEY_PATTERN = /^pt_live_[a-f0-9]{32}$/;
 const DEFAULT_API_ORIGIN = "https://www.proventools.net";
 const TRUSTED_API_ORIGINS = new Set([
   "https://www.proventools.net",
@@ -16,6 +22,9 @@ const MAX_PENDING_OUTPUT_BYTES = 2 * 1024 * 1024;
 const MAX_BUFFERED_INPUT_BYTES = 512 * 1024;
 const MAX_CONCURRENT_TOOL_CALLS = 4;
 const REQUEST_TIMEOUT_MS = 20_000;
+const MAX_CONFIG_BYTES = 16 * 1024;
+const CONFIG_PATH = path.join(os.homedir(), ".config", "proventools", "config.json");
+const NOFOLLOW_FLAG = typeof fsConstants.O_NOFOLLOW === "number" ? fsConstants.O_NOFOLLOW : 0;
 
 const ZERO_CREDIT = "Credit cost: 0. Reads stored ProvenTools data only.";
 const OPTIONAL_OPENAI =
@@ -299,14 +308,63 @@ function apiBaseUrl() {
   return url.origin;
 }
 
-function apiKey() {
-  const key = (process.env.PROVENTOOLS_API_KEY || "").trim();
-  if (!key) {
-    throw new ToolError(
-      "PROVENTOOLS_API_KEY is not set — get a key at www.proventools.net/dashboard/api-keys."
-    );
+function validatedApiKey(value) {
+  const key = typeof value === "string" ? value.trim() : "";
+  if (!key) return "";
+  if (!API_KEY_PATTERN.test(key)) {
+    throw new ToolError("The configured ProvenTools API key has an invalid format.");
   }
   return key;
+}
+
+async function storedApiKey() {
+  let handle;
+  try {
+    handle = await open(CONFIG_PATH, fsConstants.O_RDONLY | NOFOLLOW_FLAG);
+  } catch (error) {
+    if (error?.code === "ENOENT") return "";
+    if (error?.code === "ELOOP") {
+      throw new ToolError("Refusing to read a symlinked ProvenTools config file.");
+    }
+    throw new ToolError("Could not open the ProvenTools config file. Run “proventools login” to replace it.");
+  }
+
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) {
+      throw new ToolError("Refusing to read an unsafe ProvenTools config file.");
+    }
+    if (metadata.size > MAX_CONFIG_BYTES) {
+      throw new ToolError("Refusing to read an oversized ProvenTools config file.");
+    }
+    if (process.platform !== "win32" && (metadata.mode & 0o077) !== 0) {
+      throw new ToolError(
+        "Refusing to read the ProvenTools config because it is accessible by other users. Run “proventools login” to recreate it securely."
+      );
+    }
+    if (typeof process.getuid === "function" && metadata.uid !== process.getuid()) {
+      throw new ToolError("Refusing to read a ProvenTools config owned by another user.");
+    }
+
+    try {
+      return validatedApiKey(JSON.parse(await handle.readFile("utf8"))?.apiKey);
+    } catch (error) {
+      if (error instanceof ToolError) throw error;
+      throw new ToolError("Could not read the ProvenTools config file. Run “proventools login” to replace it.");
+    }
+  } finally {
+    await handle.close().catch(() => {});
+  }
+}
+
+async function apiKey() {
+  const environmentKey = validatedApiKey(process.env.PROVENTOOLS_API_KEY);
+  if (environmentKey) return environmentKey;
+  const key = await storedApiKey();
+  if (key) return key;
+  throw new ToolError(
+    "Not logged in. Run “proventools login” or set PROVENTOOLS_API_KEY."
+  );
 }
 
 async function readResponseText(response) {
@@ -353,7 +411,7 @@ async function apiRequest(path, requestOptions = {}) {
   const method = options.method || "GET";
   const baseUrl = apiBaseUrl();
   const headers = {
-    Authorization: `Bearer ${apiKey()}`,
+    Authorization: `Bearer ${await apiKey()}`,
     Accept: responseType === "text" ? "text/markdown" : "application/json",
     "User-Agent": `proventools-mcp/${SERVER_VERSION}`,
     "X-ProvenTools-Channel": "mcp",

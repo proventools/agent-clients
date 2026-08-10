@@ -10,9 +10,11 @@ package uses Node.js built-ins only and does not host a remote MCP endpoint.
 - A ProvenTools Library account with Live access
 - An API key from `https://www.proventools.net/dashboard/api-keys`
 
-Make `PROVENTOOLS_API_KEY` available through the MCP client's secret store or
-inherited environment. Never place a literal key in command arguments, shell
-history, checked-in MCP configuration, an agent prompt, or a log.
+Run `proventools login` once to save the key in the private ProvenTools CLI
+config. The MCP server reuses that file and prefers `PROVENTOOLS_API_KEY` when
+your MCP client provides it through a secret store or inherited environment.
+Never place a literal key in command arguments, shell history, checked-in MCP
+configuration, an agent prompt, or a log.
 
 The examples pin the exact beta version so an agent cannot silently execute a
 newer release.
@@ -20,13 +22,13 @@ newer release.
 ## Codex
 
 ```sh
-codex mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.1
+codex mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.2
 ```
 
 ## Claude Code
 
 ```sh
-claude mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.1
+claude mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.2
 ```
 
 ## Cursor
@@ -38,7 +40,7 @@ Add this non-secret definition to `.cursor/mcp.json`:
   "mcpServers": {
     "proventools": {
       "command": "npx",
-      "args": ["--yes", "@proventools/mcp@0.1.0-beta.1"]
+      "args": ["--yes", "@proventools/mcp@0.1.0-beta.2"]
     }
   }
 }
@@ -49,7 +51,7 @@ Add this non-secret definition to `.cursor/mcp.json`:
 ```json
 {
   "command": "npx",
-  "args": ["--yes", "@proventools/mcp@0.1.0-beta.1"]
+  "args": ["--yes", "@proventools/mcp@0.1.0-beta.2"]
 }
 ```
 

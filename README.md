@@ -4,15 +4,15 @@ Official open-source clients for connecting developer tools and local agents
 to ProvenTools.
 
 - `proventools`: read-only CLI plus a bundled agent skill
-- `@proventools/mcp`: local stdio MCP server
+- `@proventools/mcp`: read-only local stdio MCP server
 
 The hosted ProvenTools application, API implementation, datasets, content,
 and customer systems are not part of this repository.
 
 ## Status
 
-The CLI is prepared for its separately approved bootstrap beta. The MCP
-package remains protected by `private: true` until its own review and release.
+The CLI beta is published on npm and GitHub. The MCP beta has passed its
+security review and is prepared for a separately approved bootstrap release.
 
 ## Verify
 

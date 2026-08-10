@@ -63,7 +63,7 @@ const packages = [
     directory: "packages/mcp",
     name: "@proventools/mcp",
     binName: "proventools-mcp",
-    private: true,
+    private: false,
     repositoryDirectory: "packages/mcp",
     declaredFiles: ["index.js", "README.md", "LICENSE"],
     archiveFiles: [

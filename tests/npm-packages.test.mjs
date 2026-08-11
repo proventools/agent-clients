@@ -62,7 +62,7 @@ const packages = [
   {
     directory: "packages/mcp",
     name: "@proventools/mcp",
-    version: "0.1.0-beta.2",
+    version: "0.1.0-beta.3",
     binName: "proventools-mcp",
     private: false,
     repositoryDirectory: "packages/mcp",
@@ -157,6 +157,9 @@ for (const packageDefinition of packages) {
     assert.deepEqual(sourceManifest.files, packageDefinition.declaredFiles);
     assert.deepEqual(sourceManifest.publishConfig, expectedPublishConfig);
     assertPublicProductMetadata(sourceManifest, packageDefinition.repositoryDirectory);
+    if (packageDefinition.name === "@proventools/mcp") {
+      assert.equal(sourceManifest.mcpName, "io.github.proventools/proventools");
+    }
 
     const npmOutput = execFileSync(
       "npm",
@@ -197,6 +200,9 @@ for (const packageDefinition of packages) {
     assert.deepEqual(artifactManifest.files, packageDefinition.declaredFiles);
     assert.deepEqual(artifactManifest.publishConfig, expectedPublishConfig);
     assertPublicProductMetadata(artifactManifest, packageDefinition.repositoryDirectory);
+    if (packageDefinition.name === "@proventools/mcp") {
+      assert.equal(artifactManifest.mcpName, "io.github.proventools/proventools");
+    }
 
     const artifactText = await Promise.all(
       packageDefinition.archiveFiles

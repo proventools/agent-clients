@@ -1,0 +1,61 @@
+name: Publish MCP Registry metadata
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact MCP version already published and verified on npm
+        required: true
+        type: choice
+        options:
+          - 0.1.0-beta.3
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-registry-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && inputs.version == '0.1.0-beta.3'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: mcp-registry
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Verify approved registry metadata
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+        run: |
+          test "$(jq -r '.name' server.json)" = "io.github.proventools/proventools"
+          test "$(jq -r '.version' server.json)" = "${EXPECTED_VERSION}"
+          test "$(jq -r '.packages[0].identifier' server.json)" = "@proventools/mcp"
+          test "$(jq -r '.packages[0].version' server.json)" = "${EXPECTED_VERSION}"
+
+      - name: Download verified MCP publisher
+        env:
+          PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            --output mcp-publisher.tar.gz \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "${PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum --check --strict
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+
+      - name: Validate registry metadata
+        run: ./mcp-publisher validate
+
+      - name: Authenticate as the GitHub organization repository
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish registry metadata
+        run: ./mcp-publisher publish

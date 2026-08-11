@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "proventools": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@proventools/mcp@0.1.0-beta.3"
+      ]
+    }
+  }
+}

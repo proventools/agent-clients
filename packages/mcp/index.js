@@ -5,7 +5,7 @@ import { open } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const SERVER_VERSION = "0.1.0-beta.2";
+const SERVER_VERSION = "0.1.0-beta.3";
 const PROTOCOL_VERSION = "2024-11-05";
 const API_KEY_PATTERN = /^pt_live_[a-f0-9]{32}$/;
 const DEFAULT_API_ORIGIN = "https://www.proventools.net";

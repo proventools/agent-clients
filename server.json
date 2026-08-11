@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.proventools/proventools",
+  "title": "ProvenTools",
+  "description": "Read-only local access to the ProvenTools curated business idea library, evidence, build prompts, and existing validation reports.",
+  "repository": {
+    "url": "https://github.com/proventools/agent-clients",
+    "source": "github"
+  },
+  "version": "0.1.0-beta.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@proventools/mcp",
+      "version": "0.1.0-beta.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Optional ProvenTools API key from the dashboard. Keep it in the client's secret store; never commit it to a project file.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "PROVENTOOLS_API_KEY"
+        }
+      ]
+    }
+  ]
+}

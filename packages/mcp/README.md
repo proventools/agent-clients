@@ -22,13 +22,13 @@ newer release.
 ## Codex
 
 ```sh
-codex mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.2
+codex mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.3
 ```
 
 ## Claude Code
 
 ```sh
-claude mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.2
+claude mcp add proventools -- npx --yes @proventools/mcp@0.1.0-beta.3
 ```
 
 ## Cursor
@@ -40,7 +40,7 @@ Add this non-secret definition to `.cursor/mcp.json`:
   "mcpServers": {
     "proventools": {
       "command": "npx",
-      "args": ["--yes", "@proventools/mcp@0.1.0-beta.2"]
+      "args": ["--yes", "@proventools/mcp@0.1.0-beta.3"]
     }
   }
 }
@@ -51,7 +51,7 @@ Add this non-secret definition to `.cursor/mcp.json`:
 ```json
 {
   "command": "npx",
-  "args": ["--yes", "@proventools/mcp@0.1.0-beta.2"]
+  "args": ["--yes", "@proventools/mcp@0.1.0-beta.3"]
 }
 ```
 

@@ -13,6 +13,14 @@ and customer systems are not part of this repository.
 
 The CLI and read-only local MCP betas are published on npm and GitHub.
 
+The repository also contains metadata prepared for the official MCP Registry,
+Claude's community plugin marketplace, and the Cursor Directory. Installing
+the clients is free. Access to ProvenTools data still requires an eligible
+ProvenTools account and API key.
+
+Directory publication is approval-gated and is not performed by the test or
+npm staging workflows.
+
 ## Verify
 
 Use Node.js 22.14 or newer:

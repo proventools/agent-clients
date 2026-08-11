@@ -112,3 +112,26 @@ test("the directory skill is plaintext, safe, and does not contain private ident
   assert.doesNotMatch(text, /(?:npm|npx)\s+(?:install|add)(?:\s|$)/i);
   assert.doesNotMatch(text, /@proventools\/mcp@(?!0\.1\.0-beta\.3)/);
 });
+
+test("registry publication is manual, protected, pinned, and metadata-only", async () => {
+  const workflow = await readFile(
+    path.join(root, ".github/workflows/publish-mcp-registry.yml"),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /environment: mcp-registry/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /releases\/download\/v1\.8\.1\/mcp-publisher_linux_amd64\.tar\.gz/);
+  assert.match(workflow, /a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc/);
+  assert.doesNotMatch(workflow, /releases\/latest/);
+  assert.doesNotMatch(workflow, /npm (?:publish|stage publish)/);
+  assert.doesNotMatch(workflow, /MCP_GITHUB_TOKEN|NPM_TOKEN|secrets\./);
+
+  const validate = workflow.indexOf("./mcp-publisher validate");
+  const login = workflow.indexOf("./mcp-publisher login github-oidc");
+  const publish = workflow.indexOf("./mcp-publisher publish");
+  assert.ok(validate >= 0 && validate < login && login < publish);
+});

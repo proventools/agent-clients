@@ -44,6 +44,7 @@ test("official MCP Registry metadata matches the exact npm package", async () =>
   assert.equal(server.$schema, "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json");
   assert.equal(server.name, registryName);
   assert.equal(server.version, mcpVersion);
+  assert.ok(server.description.length <= 100, "registry descriptions cannot exceed 100 characters");
   assert.equal(manifest.name, "@proventools/mcp");
   assert.equal(manifest.version, mcpVersion);
   assert.equal(manifest.mcpName, registryName);
